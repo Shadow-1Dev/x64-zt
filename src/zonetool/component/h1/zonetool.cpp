@@ -251,13 +251,15 @@ namespace zonetool::h1
 		std::vector<std::string> defaultzones;
 		if (!utils::flags::has_flag("no_code_post_gfx"))
 		{
-			defaultzones.push_back(utils::flags::has_flag("sp") ? "code_post_gfx" : "code_post_gfx_mp");
+			//defaultzones.push_back(utils::flags::has_flag("sp") ? "code_post_gfx" : "code_post_gfx_mp");
+			defaultzones.push_back(utils::flags::has_flag("sp") ? "code_post_gfx" : "code_post_gfx");
 		}
 		if (!utils::flags::has_flag("no_common"))
 		{
-			defaultzones.push_back(utils::flags::has_flag("sp") ? "common" : "common_mp");
+			//defaultzones.push_back(utils::flags::has_flag("sp") ? "common" : "common_mp");
+			defaultzones.push_back(utils::flags::has_flag("sp") ? "common" : "common");
 
-			defaultzones.push_back("techsets_common_mp");
+			//defaultzones.push_back("techsets_common_mp");
 			defaultzones.push_back("techsets_common");
 		}
 

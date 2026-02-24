@@ -8,13 +8,13 @@
 #define ASSET_TEMPLATE typename S, std::int32_t Type, typename Types, typename H, typename E, typename Streams
 
 #define REGISTER_TEMPLATED_ASSET_CLASS(__name__, __class__, __struct__, __type__, ...) \
-	using __name__ = zonetool::__class__<__struct__, __type__, XAssetType, XAssetHeader, XAssetEntry, XFileBlock, __VA_ARGS__> \
+	using __name__ = zonetool::__class__<__struct__, __type__, XAssetType, XAssetHeader, XAssetEntry, XFileBlock, __VA_ARGS__>
 
 #define REGISTER_TEMPLATED_ASSET(__name__, __struct__, __type__, ...) \
-	using __name__ = zonetool::__name__<__struct__, __type__, XAssetType, XAssetHeader, XAssetEntry, XFileBlock, __VA_ARGS__> \
+	using __name__ = zonetool::__name__<__struct__, __type__, XAssetType, XAssetHeader, XAssetEntry, XFileBlock, __VA_ARGS__>
 
 #define TYPEOF_MEMBER(__struct__, __member__) \
-	std::remove_pointer<typename std::remove_all_extents<decltype(std::declval<__struct__>().__member__)>::type>::type \
+	std::remove_pointer<typename std::remove_all_extents<decltype(std::declval<__struct__>().__member__)>::type>::type
 
 #include "../shared/assets/rawfile.hpp"
 #include "../shared/assets/luafile.hpp"
@@ -32,7 +32,7 @@
 static inline void branding()
 {
 	ZONETOOL_INFO("No matter how hard or unlikely, if it's possible, it will be done.");
-	ZONETOOL_INFO("Special thanks to: RektInator, Laupetin, NTAuthority, momo5502, TheApadayo, localhost, X3RX35, homura, quaK & alice");
+	ZONETOOL_INFO("Special thanks to: Shadow, RektInator, Laupetin, NTAuthority, momo5502, TheApadayo, localhost, X3RX35, homura, quaK & alice");
 }
 
 #ifdef DEBUG

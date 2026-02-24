@@ -167,6 +167,224 @@ namespace zonetool::h2
 		weapon->__field__ = nullptr; \
 	}
 
+	namespace
+	{
+		constexpr std::size_t kNumHideTags = 32;
+		constexpr std::size_t kNumNotetrackSoundMap = 36;
+		constexpr std::size_t kNumNotetrackRumbleMap = 16;
+		constexpr std::size_t kNumNotetrackFxMap = 16;
+		constexpr std::size_t kNumNotetrackUnknown = 16;
+
+		std::string json_string_or_empty(const json& value)
+		{
+			return value.is_string() ? value.get<std::string>() : "";
+		}
+
+		void normalize_string_array(json& data, const char* field, std::size_t size)
+		{
+			const auto source = data[field];
+			auto normalized = json::array();
+
+			for (std::size_t i = 0; i < size; i++)
+			{
+				if (source.is_array() && i < source.size())
+				{
+					normalized.push_back(json_string_or_empty(source[i]));
+				}
+				else
+				{
+					normalized.push_back("");
+				}
+			}
+
+			data[field] = std::move(normalized);
+		}
+
+		void normalize_int_array(json& data, const char* field, std::size_t size)
+		{
+			const auto source = data[field];
+			auto normalized = json::array();
+
+			for (std::size_t i = 0; i < size; i++)
+			{
+				if (source.is_array() && i < source.size() && source[i].is_number_integer())
+				{
+					normalized.push_back(source[i].get<int>());
+				}
+				else if (source.is_array() && i < source.size() && source[i].is_number())
+				{
+					normalized.push_back(static_cast<int>(source[i].get<double>()));
+				}
+				else
+				{
+					normalized.push_back(0);
+				}
+			}
+
+			data[field] = std::move(normalized);
+		}
+
+		void normalize_notetrack_key_value_arrays(json& data, const char* object_field, const char* keys_field, const char* values_field, std::size_t size)
+		{
+			const auto source_object = data[object_field];
+			const auto source_keys = data[keys_field];
+			const auto source_values = data[values_field];
+			auto normalized_keys = json::array();
+			auto normalized_values = json::array();
+
+			for (std::size_t i = 0; i < size; i++)
+			{
+				std::string key;
+				std::string value;
+
+				if (source_keys.is_array() || source_values.is_array())
+				{
+					key = (source_keys.is_array() && i < source_keys.size()) ? json_string_or_empty(source_keys[i]) : "";
+					value = (source_values.is_array() && i < source_values.size()) ? json_string_or_empty(source_values[i]) : "";
+				}
+				else if (source_object.is_array() && i < source_object.size() && source_object[i].is_object())
+				{
+					key = json_string_or_empty(source_object[i]["Key"]);
+					value = json_string_or_empty(source_object[i]["Value"]);
+				}
+				else
+				{
+					key = "";
+					value = "";
+				}
+
+				normalized_keys.push_back(key);
+				normalized_values.push_back(value);
+			}
+
+			data[keys_field] = std::move(normalized_keys);
+			data[values_field] = std::move(normalized_values);
+		}
+
+		void normalize_notetrack_fx_arrays(json& data, std::size_t size)
+		{
+			const auto source_object = data["notetrackFXMap"];
+			const auto source_keys = data["notetrackFXMapKeys"];
+			const auto source_values = data["notetrackFXMapValues"];
+			const auto source_tags = data["notetrackFXMapTagValues"];
+			auto normalized_keys = json::array();
+			auto normalized_values = json::array();
+			auto normalized_tags = json::array();
+
+			for (std::size_t i = 0; i < size; i++)
+			{
+				std::string key;
+				std::string value;
+				std::string tag;
+
+				if (source_keys.is_array() || source_values.is_array() || source_tags.is_array())
+				{
+					key = (source_keys.is_array() && i < source_keys.size()) ? json_string_or_empty(source_keys[i]) : "";
+					value = (source_values.is_array() && i < source_values.size()) ? json_string_or_empty(source_values[i]) : "";
+					tag = (source_tags.is_array() && i < source_tags.size()) ? json_string_or_empty(source_tags[i]) : "";
+				}
+				else if (source_object.is_array() && i < source_object.size() && source_object[i].is_object())
+				{
+					key = json_string_or_empty(source_object[i]["Key"]);
+					value = json_string_or_empty(source_object[i]["Value"]);
+					tag = json_string_or_empty(source_object[i]["Tag"]);
+				}
+				else
+				{
+					key = "";
+					value = "";
+					tag = "";
+				}
+
+				normalized_keys.push_back(key);
+				normalized_values.push_back(value);
+				normalized_tags.push_back(tag);
+			}
+
+			data["notetrackFXMapKeys"] = std::move(normalized_keys);
+			data["notetrackFXMapValues"] = std::move(normalized_values);
+			data["notetrackFXMapTagValues"] = std::move(normalized_tags);
+		}
+
+		void normalize_notetrack_overrides(json& data)
+		{
+			if (!data["notetrackOverrides"].is_array())
+			{
+				data["notetrackOverrides"] = json::array();
+				return;
+			}
+
+			auto normalized_overrides = json::array();
+			for (const auto& source_override : data["notetrackOverrides"])
+			{
+				auto normalized_override = source_override.is_object() ? source_override : json::object();
+				normalized_override["attachment"] = source_override.is_object() && source_override["attachment"].is_number_integer()
+					? source_override["attachment"].get<int>()
+					: 0;
+
+				const auto source_map = source_override.is_object() ? source_override["notetrackSoundMap"] : json();
+				const auto source_keys = source_override.is_object() ? source_override["notetrackSoundMapKeys"] : json();
+				const auto source_values = source_override.is_object() ? source_override["notetrackSoundMapValues"] : json();
+
+				auto normalized_keys = json::array();
+				auto normalized_values = json::array();
+
+				for (std::size_t i = 0; i < kNumNotetrackSoundMap; i++)
+				{
+					std::string key;
+					std::string value;
+
+					if (source_keys.is_array() || source_values.is_array())
+					{
+						key = (source_keys.is_array() && i < source_keys.size()) ? json_string_or_empty(source_keys[i]) : "";
+						value = (source_values.is_array() && i < source_values.size()) ? json_string_or_empty(source_values[i]) : "";
+					}
+					else if (source_map.is_array() && i < source_map.size() && source_map[i].is_object())
+					{
+						key = json_string_or_empty(source_map[i]["Key"]);
+						value = json_string_or_empty(source_map[i]["Value"]);
+					}
+					else
+					{
+						key = "";
+						value = "";
+					}
+
+					normalized_keys.push_back(key);
+					normalized_values.push_back(value);
+				}
+
+				normalized_override["notetrackSoundMapKeys"] = std::move(normalized_keys);
+				normalized_override["notetrackSoundMapValues"] = std::move(normalized_values);
+				normalized_overrides.push_back(std::move(normalized_override));
+			}
+
+			data["notetrackOverrides"] = std::move(normalized_overrides);
+		}
+
+		void normalize_weapon_json(json& data)
+		{
+			normalize_string_array(data, "hideTags", kNumHideTags);
+			normalize_notetrack_key_value_arrays(data, "notetrackSoundMap", "notetrackSoundMapKeys", "notetrackSoundMapValues", kNumNotetrackSoundMap);
+			normalize_notetrack_key_value_arrays(data, "notetrackRumbleMap", "notetrackRumbleMapKeys", "notetrackRumbleMapValues", kNumNotetrackRumbleMap);
+			normalize_notetrack_fx_arrays(data, kNumNotetrackFxMap);
+			normalize_string_array(data, "notetrackUnknownKeys", kNumNotetrackUnknown);
+			normalize_string_array(data, "notetrackUnknownValues", kNumNotetrackUnknown);
+			normalize_int_array(data, "notetrackUnknown", kNumNotetrackUnknown);
+			normalize_notetrack_overrides(data);
+
+			if (data["ammoUsedPerShot"].is_null() && data["ammoPerShot"].is_number())
+			{
+				data["ammoUsedPerShot"] = static_cast<int>(data["ammoPerShot"].get<double>());
+			}
+
+			if (data["adsSceneBlur"].is_boolean())
+			{
+				data["adsSceneBlur"] = data["adsSceneBlur"].get<bool>() ? 1.0f : 0.0f;
+			}
+		}
+	}
+
 	void parse_overlay(ADSOverlay * weapon, json & data)
 	{
 		WEAPON_READ_ASSET(ASSET_TYPE_MATERIAL, material, shader);
@@ -361,6 +579,7 @@ namespace zonetool::h2
 		auto bytes = file.read_bytes(size);
 		file.close();
 		json data = json::parse(bytes);
+		normalize_weapon_json(data);
 
 		auto* weapon = mem->allocate<WeaponDef>();
 

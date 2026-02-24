@@ -123,9 +123,11 @@ namespace zonetool::s1
 	{
 		static std::vector<std::string> defaultzones =
 		{
-			"code_post_gfx_mp",
+			//"code_post_gfx_mp",
+			"code_post_gfx",
 			//"ui_mp",
 			//"common_mp",
+			"common",
 		};
 
 		XZoneInfo zones[8]{ 0 };
