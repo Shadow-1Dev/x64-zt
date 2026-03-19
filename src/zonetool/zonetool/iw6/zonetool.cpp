@@ -420,6 +420,8 @@ namespace zonetool::iw6
 			return;
 		}
 
+		zonetool::operation_logger::record_asset(type_to_string(asset->type), get_asset_name(asset));
+
 		if (globals.csv_file.get_fp() == nullptr)
 		{
 			globals.csv_file = filesystem::file(filesystem::get_fastfile() + ".csv");
@@ -737,6 +739,8 @@ namespace zonetool::iw6
 
 	void dump_zone(const std::string& name, const game::game_mode target)
 	{
+		zonetool::operation_logger::operation_scope operation_log("dump", name);
+
 		if (!zone_exists(name.data()))
 		{
 			ZONETOOL_INFO("Zone \"%s\" could not be found!", name.data());
@@ -759,6 +763,8 @@ namespace zonetool::iw6
 		{
 			Sleep(1);
 		}
+
+		operation_log.mark_success();
 	}
 
 	void verify_zone(const std::string& name)
@@ -983,6 +989,8 @@ namespace zonetool::iw6
 
 	void build_zone(const std::string& fastfile)
 	{
+		zonetool::operation_logger::operation_scope operation_log("build", fastfile);
+
 		// make sure FS is correct.
 		filesystem::set_fastfile(fastfile);
 
@@ -1020,6 +1028,8 @@ namespace zonetool::iw6
 		// clear asset shit
 		material::fixed_nml_images_map.clear();
 		techset::vertexdecl_pointers.clear();
+
+		operation_log.mark_success();
 	}
 
 	void register_commands()

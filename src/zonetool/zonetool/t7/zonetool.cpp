@@ -259,6 +259,8 @@ namespace zonetool::t7
 			return;
 		}
 
+		zonetool::operation_logger::record_asset(type_to_string(asset->type), get_asset_name(asset));
+
 		// dump referenced later
 		if (is_referenced_asset(asset))
 		{
@@ -463,6 +465,9 @@ namespace zonetool::t7
 
 	void dump_zone(const std::string& name, const game::game_mode target, const std::optional<std::string> fastfile = {})
 	{
+		const auto log_name = fastfile.has_value() ? fastfile.value() : name;
+		zonetool::operation_logger::operation_scope operation_log("dump", log_name);
+
 		if (!zone_exists(name.data()))
 		{
 			ZONETOOL_INFO("Zone \"%s\" could not be found!", name.data());
@@ -496,6 +501,8 @@ namespace zonetool::t7
 		{
 			Sleep(1);
 		}
+
+		operation_log.mark_success();
 	}
 
 	void dump_csv(const std::string& name)

@@ -169,9 +169,88 @@ namespace zonetool::h1
 			return value.is_string() ? value.get<std::string>() : "";
 		}
 
+		const json* json_find_member(const json& value, const char* key)
+		{
+			if (!value.is_object())
+			{
+				return nullptr;
+			}
+
+			const auto it = value.find(key);
+			if (it == value.end())
+			{
+				return nullptr;
+			}
+
+			return &(*it);
+		}
+
+		std::string json_member_string_or_empty(const json& value, const char* key)
+		{
+			const auto* member = json_find_member(value, key);
+			return member && member->is_string() ? member->get<std::string>() : "";
+		}
+
+		bool json_member_bool_or_false(const json& value, const char* key)
+		{
+			const auto* member = json_find_member(value, key);
+			return member && member->is_boolean() ? member->get<bool>() : false;
+		}
+
+		int json_member_int_or_zero(const json& value, const char* key)
+		{
+			const auto* member = json_find_member(value, key);
+			if (!member)
+			{
+				return 0;
+			}
+
+			if (member->is_number_integer())
+			{
+				return member->get<int>();
+			}
+
+			if (member->is_number())
+			{
+				return static_cast<int>(member->get<double>());
+			}
+
+			return 0;
+		}
+
 		bool json_bool_or_false(const json& value)
 		{
 			return value.is_boolean() ? value.get<bool>() : false;
+		}
+
+		std::string json_sound_or_empty(const json& sounds, const char* key)
+		{
+			return json_member_string_or_empty(sounds, key);
+		}
+
+		void set_sound_if_missing(json& sounds, const char* key, const std::string& value)
+		{
+			if (!sounds.is_object())
+			{
+				return;
+			}
+
+			const auto current = json_sound_or_empty(sounds, key);
+			if (current.empty() && !value.empty())
+			{
+				sounds[key] = value;
+			}
+		}
+
+		void alias_sound_if_missing(json& sounds, const char* destination, const char* source)
+		{
+			set_sound_if_missing(sounds, destination, json_sound_or_empty(sounds, source));
+		}
+
+		bool string_starts_with(const std::string& value, const char* prefix)
+		{
+			const auto prefix_len = std::strlen(prefix);
+			return value.size() >= prefix_len && value.compare(0, prefix_len, prefix) == 0;
 		}
 
 		void normalize_anim_map(json& data, const char* field)
@@ -184,7 +263,7 @@ namespace zonetool::h1
 				const auto anim_name = get_anim_name_from_index(i);
 				if (source.is_object())
 				{
-					normalized[anim_name] = json_string_or_empty(source[anim_name]);
+					normalized[anim_name] = json_member_string_or_empty(source, anim_name);
 				}
 				else
 				{
@@ -205,7 +284,8 @@ namespace zonetool::h1
 			for (auto i = 0u; i < NUM_WEAP_ANIMS; i++)
 			{
 				const auto anim_name = get_anim_name_from_index(i);
-				if (value[anim_name].is_string() && !value[anim_name].get<std::string>().empty())
+				const auto anim_value = json_member_string_or_empty(value, anim_name);
+				if (!anim_value.empty())
 				{
 					return true;
 				}
@@ -248,8 +328,8 @@ namespace zonetool::h1
 
 				if (source_object.is_array() && i < source_object.size() && source_object[i].is_object())
 				{
-					key = json_string_or_empty(source_object[i]["Key"]);
-					value = json_string_or_empty(source_object[i]["Value"]);
+					key = json_member_string_or_empty(source_object[i], "Key");
+					value = json_member_string_or_empty(source_object[i], "Value");
 				}
 				else
 				{
@@ -282,9 +362,9 @@ namespace zonetool::h1
 
 				if (source_object.is_array() && i < source_object.size() && source_object[i].is_object())
 				{
-					key = json_string_or_empty(source_object[i]["Key"]);
-					value = json_string_or_empty(source_object[i]["Value"]);
-					tag = json_string_or_empty(source_object[i]["Tag"]);
+					key = json_member_string_or_empty(source_object[i], "Key");
+					value = json_member_string_or_empty(source_object[i], "Value");
+					tag = json_member_string_or_empty(source_object[i], "Tag");
 				}
 				else
 				{
@@ -317,9 +397,9 @@ namespace zonetool::h1
 
 				if (source.is_array() && i < source.size() && source[i].is_object())
 				{
-					key = json_string_or_empty(source[i]["Key"]);
-					value = json_bool_or_false(source[i]["Value"]);
-					tag = json_string_or_empty(source[i]["Tag"]);
+					key = json_member_string_or_empty(source[i], "Key");
+					value = json_member_bool_or_false(source[i], "Value");
+					tag = json_member_string_or_empty(source[i], "Tag");
 				}
 				else
 				{
@@ -351,13 +431,14 @@ namespace zonetool::h1
 			for (const auto& source_override : data["notetrackOverrides"])
 			{
 				auto normalized_override = json::object();
-				normalized_override["attachment"] = source_override.is_object() && source_override["attachment"].is_number_integer()
-					? source_override["attachment"].get<int>()
-					: 0;
+				normalized_override["attachment"] = json_member_int_or_zero(source_override, "attachment");
 
-				const auto source_map = source_override.is_object() ? source_override["notetrackSoundMap"] : json();
-				const auto source_keys = source_override.is_object() ? source_override["notetrackSoundMapKeys"] : json();
-				const auto source_values = source_override.is_object() ? source_override["notetrackSoundMapValues"] : json();
+				const auto* source_map_member = json_find_member(source_override, "notetrackSoundMap");
+				const auto* source_keys_member = json_find_member(source_override, "notetrackSoundMapKeys");
+				const auto* source_values_member = json_find_member(source_override, "notetrackSoundMapValues");
+				const auto source_map = source_map_member ? *source_map_member : json();
+				const auto source_keys = source_keys_member ? *source_keys_member : json();
+				const auto source_values = source_values_member ? *source_values_member : json();
 
 				auto normalized_map = json::array();
 				for (std::size_t i = 0; i < kNumNotetrackSoundMap; i++)
@@ -367,8 +448,8 @@ namespace zonetool::h1
 
 					if (source_map.is_array() && i < source_map.size() && source_map[i].is_object())
 					{
-						key = json_string_or_empty(source_map[i]["Key"]);
-						value = json_string_or_empty(source_map[i]["Value"]);
+						key = json_member_string_or_empty(source_map[i], "Key");
+						value = json_member_string_or_empty(source_map[i], "Value");
 					}
 					else
 					{
@@ -420,6 +501,93 @@ namespace zonetool::h1
 			{
 				data["ammoPerShot"] = static_cast<int>(data["ammoUsedPerShot"].get<double>());
 			}
+
+			if (!data["sounds"].is_object())
+			{
+				data["sounds"] = json::object();
+			}
+
+			auto& sounds = data["sounds"];
+
+			alias_sound_if_missing(sounds, "fireMedLoopSound", "sound21");
+			alias_sound_if_missing(sounds, "fireMedLoopSoundPlayer", "sound22");
+			alias_sound_if_missing(sounds, "fireHighLoopSound", "sound23");
+			alias_sound_if_missing(sounds, "fireHighLoopSoundPlayer", "sound24");
+			alias_sound_if_missing(sounds, "fireLoopEndPointSound", "sound25");
+			alias_sound_if_missing(sounds, "fireLoopEndPointSoundPlayer", "sound26");
+			alias_sound_if_missing(sounds, "fireMedStopSound", "sound29");
+			alias_sound_if_missing(sounds, "fireMedStopSoundPlayer", "sound30");
+			alias_sound_if_missing(sounds, "fireHighStopSound", "sound31");
+			alias_sound_if_missing(sounds, "fireHighStopSoundPlayer", "sound32");
+			alias_sound_if_missing(sounds, "fireLastSound", "sound33");
+			alias_sound_if_missing(sounds, "fireCustomSound", "fireSound2");
+			alias_sound_if_missing(sounds, "fireCustomSoundPlayer", "fireSoundPlayer2");
+			alias_sound_if_missing(sounds, "adsUpSound", "adsEnterSoundPlayer");
+			alias_sound_if_missing(sounds, "adsDownSound", "adsLeaveSoundPlayer");
+
+			set_sound_if_missing(sounds, "fireSoundPlayer", json_sound_or_empty(sounds, "fireSoundPlayerLeft"));
+			set_sound_if_missing(sounds, "fireSoundPlayer", json_sound_or_empty(sounds, "fireSoundPlayerRight"));
+			set_sound_if_missing(sounds, "fireSoundPlayerAkimbo", json_sound_or_empty(sounds, "fireSoundPlayerLeft"));
+			set_sound_if_missing(sounds, "fireSoundPlayerAkimbo", json_sound_or_empty(sounds, "fireSoundPlayerRight"));
+			set_sound_if_missing(sounds, "fireSound", json_sound_or_empty(sounds, "fireFirstSound"));
+			set_sound_if_missing(sounds, "fireSoundPlayer", json_sound_or_empty(sounds, "fireFirstSoundPlayer"));
+
+			const auto fire_sound = json_sound_or_empty(sounds, "fireSound");
+			const auto fire_sound_player = json_sound_or_empty(sounds, "fireSoundPlayer");
+			if (!fire_sound_player.empty() && string_starts_with(fire_sound, "h2_"))
+			{
+				sounds["fireSound"] = fire_sound_player;
+			}
+
+			const auto fire_first_sound = json_sound_or_empty(sounds, "fireFirstSound");
+			const auto fire_first_sound_player = json_sound_or_empty(sounds, "fireFirstSoundPlayer");
+			if (!fire_first_sound_player.empty() && string_starts_with(fire_first_sound, "h2_"))
+			{
+				sounds["fireFirstSound"] = fire_first_sound_player;
+			}
+
+			const auto fire_first_sound_resolved = json_sound_or_empty(sounds, "fireFirstSound");
+			const auto fire_first_sound_player_resolved = json_sound_or_empty(sounds, "fireFirstSoundPlayer");
+			const auto is_h2_converted_fire = string_starts_with(fire_sound, "h2_") || string_starts_with(fire_first_sound, "h2_");
+			if (is_h2_converted_fire)
+			{
+				// Force sustained fire to reuse first-shot aliases for converted H2 weapons.
+				if (!fire_first_sound_player_resolved.empty())
+				{
+					sounds["fireLoopSoundPlayer"] = fire_first_sound_player_resolved;
+				}
+				if (!fire_first_sound_resolved.empty())
+				{
+					sounds["fireLoopSound"] = fire_first_sound_resolved;
+				}
+			}
+
+			const auto fire_loop_sound = json_sound_or_empty(sounds, "fireLoopSound");
+			const auto fire_loop_sound_player = json_sound_or_empty(sounds, "fireLoopSoundPlayer");
+			if (string_starts_with(fire_sound, "h2_")
+				&& fire_loop_sound.empty()
+				&& fire_loop_sound_player.empty()
+				&& !fire_first_sound_player.empty())
+			{
+				// Converted H2 weapons can end up with a non-looping regular fire alias.
+				// Promote the known-good first-shot player alias for sustained fire.
+				sounds["fireSoundPlayer"] = fire_first_sound_player;
+				sounds["fireSound"] = fire_first_sound_player;
+			}
+
+			set_sound_if_missing(sounds, "fireLoopSoundPlayer", json_sound_or_empty(sounds, "fireSoundPlayer"));
+			set_sound_if_missing(sounds, "fireLoopSound", json_sound_or_empty(sounds, "fireSoundPlayer"));
+			set_sound_if_missing(sounds, "fireLoopSound", json_sound_or_empty(sounds, "fireSound"));
+			set_sound_if_missing(sounds, "fireLoopSound", json_sound_or_empty(sounds, "fireFirstSound"));
+			set_sound_if_missing(sounds, "fireLoopSoundPlayer", json_sound_or_empty(sounds, "fireFirstSoundPlayer"));
+
+			set_sound_if_missing(sounds, "fireMedLoopSound", json_sound_or_empty(sounds, "fireLoopSound"));
+			set_sound_if_missing(sounds, "fireMedLoopSoundPlayer", json_sound_or_empty(sounds, "fireLoopSoundPlayer"));
+			set_sound_if_missing(sounds, "fireHighLoopSound", json_sound_or_empty(sounds, "fireLoopSound"));
+			set_sound_if_missing(sounds, "fireHighLoopSoundPlayer", json_sound_or_empty(sounds, "fireLoopSoundPlayer"));
+
+			set_sound_if_missing(sounds, "fireLoopEndPointSound", json_sound_or_empty(sounds, "fireStopSound"));
+			set_sound_if_missing(sounds, "fireLoopEndPointSoundPlayer", json_sound_or_empty(sounds, "fireStopSoundPlayer"));
 		}
 	}
 

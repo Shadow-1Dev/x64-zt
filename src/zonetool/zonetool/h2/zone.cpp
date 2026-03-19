@@ -117,6 +117,8 @@ namespace zonetool::h2
 			return;
 		}
 
+		zonetool::operation_logger::record_asset(type_to_string(XAssetType(type)), name);
+
 #define ADD_ASSET(__type__, ___) \
 		if (type == __type__) \
 		{ \

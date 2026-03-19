@@ -456,6 +456,8 @@ namespace zonetool::s1
 			return;
 		}
 
+		zonetool::operation_logger::record_asset(type_to_string(asset->type), get_asset_name(asset));
+
 		// dump referenced later
 		if (is_referenced_asset(asset))
 		{
@@ -649,6 +651,9 @@ namespace zonetool::s1
 
 	void dump_zone(const std::string& name, const game::game_mode target, const std::optional<std::string> fastfile = {})
 	{
+		const auto log_name = fastfile.has_value() ? fastfile.value() : name;
+		zonetool::operation_logger::operation_scope operation_log("dump", log_name);
+
 		if (!zone_exists(name.data()))
 		{
 			ZONETOOL_INFO("Zone \"%s\" could not be found!", name.data());
@@ -682,6 +687,8 @@ namespace zonetool::s1
 		{
 			Sleep(1);
 		}
+
+		operation_log.mark_success();
 	}
 
 	void dump_csv(const std::string& name)
@@ -994,6 +1001,8 @@ namespace zonetool::s1
 
 	void build_zone(const std::string& fastfile)
 	{
+		zonetool::operation_logger::operation_scope operation_log("build", fastfile);
+
 		// make sure FS is correct.
 		filesystem::set_fastfile(fastfile);
 
@@ -1032,6 +1041,8 @@ namespace zonetool::s1
 		material::fixed_nml_images_map.clear();
 		techset::vertexdecl_pointers.clear();
 		xanim_parts::secondary_anims.clear();
+
+		operation_log.mark_success();
 	}
 
 	void register_commands()

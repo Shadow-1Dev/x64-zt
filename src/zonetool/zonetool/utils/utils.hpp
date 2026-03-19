@@ -7,6 +7,7 @@
 
 #include "csv.hpp"
 #include "taskbar.hpp"
+#include "operation_logger.hpp"
 
 #include "game/mode.hpp"
 #include "game/shared.hpp"
@@ -17,9 +18,6 @@
 #include <vector>
 #include <cstdint>
 
-// ======================================================
-// ANSI COLORS (Windows 10+)
-// ======================================================
 #define ANSI_RESET   "\x1b[0m"
 
 #define ANSI_RED     "\x1b[31m"
@@ -28,9 +26,6 @@
 #define ANSI_BOLD    "\x1b[1m"
 #define ANSI_INVERT  "\x1b[7m"
 
-// ======================================================
-// JSON HELPERS
-// ======================================================
 namespace nlohmann
 {
 	static inline std::vector<std::uint8_t> get_object_bytes(json object)
@@ -56,50 +51,32 @@ namespace nlohmann
 	}
 }
 
-// ======================================================
-// LIMITS
-// ======================================================
 #define MAX_ZONE_SIZE (1024ull * 1024ull * 1024ull) * 2ull
 #define MAX_MEM_SIZE  (1024ull * 1024ull * 1024ull) * 2ull
 
-// ======================================================
-// LOG MACROS
-// ======================================================
+#define ZONETOOL_INFO(...) \
+	zonetool::operation_logger::write_log_message( \
+		zonetool::operation_logger::message_level::info, \
+		zonetool::strip_template(__FUNCTION__), \
+		__VA_ARGS__)
 
-// INFO ó »œÊ‰ √·Ê«‰ (⁄«œÌ)
-#define ZONETOOL_INFO(__FMT__, ...) \
-	printf("[ INFO ][ %s ]: " __FMT__ "\n", \
-	zonetool::strip_template(__FUNCTION__), __VA_ARGS__)
+#define ZONETOOL_WARNING(...) \
+	zonetool::operation_logger::write_log_message( \
+		zonetool::operation_logger::message_level::warning, \
+		zonetool::strip_template(__FUNCTION__), \
+		__VA_ARGS__)
 
-// WARNING ó √’›—
-#define ZONETOOL_WARNING(__FMT__, ...) \
-	printf(ANSI_YELLOW "[ WARNING ][ %s ]: " __FMT__ ANSI_RESET "\n", \
-	zonetool::strip_template(__FUNCTION__), __VA_ARGS__)
+#define ZONETOOL_ERROR(...) \
+	zonetool::operation_logger::write_log_message( \
+		zonetool::operation_logger::message_level::error, \
+		zonetool::strip_template(__FUNCTION__), \
+		__VA_ARGS__)
 
-// ERROR ó √Õ„—
-#define ZONETOOL_ERROR(__FMT__, ...) \
-	printf(ANSI_RED "[ ERROR ][ %s ]: " __FMT__ ANSI_RESET "\n", \
-	zonetool::strip_template(__FUNCTION__), __VA_ARGS__)
+#define ZONETOOL_FATAL(...) \
+	zonetool::operation_logger::fatal( \
+		zonetool::strip_template(__FUNCTION__), \
+		__VA_ARGS__)
 
-// FATAL ó √Õ„— €«„ﬁ + ⁄ﬂ”Ì
-#define ZONETOOL_FATAL(__FMT__, ...) \
-	printf(ANSI_BOLD ANSI_INVERT ANSI_RED \
-	"[ FATAL ][ %s ]: " __FMT__ ANSI_RESET "\n", \
-	zonetool::strip_template(__FUNCTION__), __VA_ARGS__); \
-	zonetool::taskbar::set_error(); \
-	MessageBoxA(nullptr, \
-	&utils::string::va( \
-	"Oops! An unexpected error occured.\n\n" \
-	"Error:\n" __FMT__ \
-	"\n\nZoneTool must be restarted.\n" \
-	"Last Win32 error: 0x%08X (%u)", \
-	__VA_ARGS__, GetLastError(), GetLastError())[0], \
-	nullptr, MB_ICONERROR); \
-	std::quick_exit(EXIT_FAILURE)
-
-// ======================================================
-// GLOBALS
-// ======================================================
 namespace zonetool
 {
 	struct zonetool_globals_t

@@ -180,6 +180,49 @@ namespace zonetool::h2
 			return value.is_string() ? value.get<std::string>() : "";
 		}
 
+		const json* json_find_member(const json& value, const char* key)
+		{
+			if (!value.is_object())
+			{
+				return nullptr;
+			}
+
+			const auto it = value.find(key);
+			if (it == value.end())
+			{
+				return nullptr;
+			}
+
+			return &(*it);
+		}
+
+		std::string json_member_string_or_empty(const json& value, const char* key)
+		{
+			const auto* member = json_find_member(value, key);
+			return member && member->is_string() ? member->get<std::string>() : "";
+		}
+
+		int json_member_int_or_zero(const json& value, const char* key)
+		{
+			const auto* member = json_find_member(value, key);
+			if (!member)
+			{
+				return 0;
+			}
+
+			if (member->is_number_integer())
+			{
+				return member->get<int>();
+			}
+
+			if (member->is_number())
+			{
+				return static_cast<int>(member->get<double>());
+			}
+
+			return 0;
+		}
+
 		void normalize_string_array(json& data, const char* field, std::size_t size)
 		{
 			const auto source = data[field];
@@ -244,8 +287,8 @@ namespace zonetool::h2
 				}
 				else if (source_object.is_array() && i < source_object.size() && source_object[i].is_object())
 				{
-					key = json_string_or_empty(source_object[i]["Key"]);
-					value = json_string_or_empty(source_object[i]["Value"]);
+					key = json_member_string_or_empty(source_object[i], "Key");
+					value = json_member_string_or_empty(source_object[i], "Value");
 				}
 				else
 				{
@@ -285,9 +328,9 @@ namespace zonetool::h2
 				}
 				else if (source_object.is_array() && i < source_object.size() && source_object[i].is_object())
 				{
-					key = json_string_or_empty(source_object[i]["Key"]);
-					value = json_string_or_empty(source_object[i]["Value"]);
-					tag = json_string_or_empty(source_object[i]["Tag"]);
+					key = json_member_string_or_empty(source_object[i], "Key");
+					value = json_member_string_or_empty(source_object[i], "Value");
+					tag = json_member_string_or_empty(source_object[i], "Tag");
 				}
 				else
 				{
@@ -318,13 +361,14 @@ namespace zonetool::h2
 			for (const auto& source_override : data["notetrackOverrides"])
 			{
 				auto normalized_override = source_override.is_object() ? source_override : json::object();
-				normalized_override["attachment"] = source_override.is_object() && source_override["attachment"].is_number_integer()
-					? source_override["attachment"].get<int>()
-					: 0;
+				normalized_override["attachment"] = json_member_int_or_zero(source_override, "attachment");
 
-				const auto source_map = source_override.is_object() ? source_override["notetrackSoundMap"] : json();
-				const auto source_keys = source_override.is_object() ? source_override["notetrackSoundMapKeys"] : json();
-				const auto source_values = source_override.is_object() ? source_override["notetrackSoundMapValues"] : json();
+				const auto* source_map_member = json_find_member(source_override, "notetrackSoundMap");
+				const auto* source_keys_member = json_find_member(source_override, "notetrackSoundMapKeys");
+				const auto* source_values_member = json_find_member(source_override, "notetrackSoundMapValues");
+				const auto source_map = source_map_member ? *source_map_member : json();
+				const auto source_keys = source_keys_member ? *source_keys_member : json();
+				const auto source_values = source_values_member ? *source_values_member : json();
 
 				auto normalized_keys = json::array();
 				auto normalized_values = json::array();
@@ -341,8 +385,8 @@ namespace zonetool::h2
 					}
 					else if (source_map.is_array() && i < source_map.size() && source_map[i].is_object())
 					{
-						key = json_string_or_empty(source_map[i]["Key"]);
-						value = json_string_or_empty(source_map[i]["Value"]);
+						key = json_member_string_or_empty(source_map[i], "Key");
+						value = json_member_string_or_empty(source_map[i], "Value");
 					}
 					else
 					{
