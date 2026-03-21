@@ -25,6 +25,22 @@ namespace zonetool::h2
 	std::vector<std::pair<XAssetType, std::string>> referenced_assets;
 	std::unordered_set<XAssetType> asset_type_filter;
 	bool resolving_references = false;
+	std::optional<bool> dump_images_as_dds_override;
+
+	bool should_dump_images_as_dds()
+	{
+		if (dump_images_as_dds_override.has_value())
+		{
+			return dump_images_as_dds_override.value();
+		}
+
+		return utils::flags::has_flag("dds");
+	}
+
+	void set_dump_images_as_dds_override(const std::optional<bool>& value)
+	{
+		dump_images_as_dds_override = value;
+	}
 
 	const char* get_asset_name(XAssetType type, void* pointer)
 	{
@@ -160,7 +176,21 @@ namespace zonetool::h2
 			DUMP_ASSET(ASSET_TYPE_SCRIPTFILE, scriptfile, ScriptFile);
 			DUMP_ASSET_NO_CONVERT(ASSET_TYPE_SKELETON_SCRIPT, skeleton_script, SkeletonScript);
 			DUMP_ASSET(ASSET_TYPE_SOUND, sound, snd_alias_list_t);
-			DUMP_ASSET_NO_CONVERT(ASSET_TYPE_SOUND_CONTEXT, sound_context, SndContext);
+			if (asset->type == ASSET_TYPE_SOUND_CONTEXT)
+			{
+				if (IS_DEBUG)
+				{
+					ZONETOOL_INFO("Dumping and converting asset \"%s\" of type %s.", get_asset_name(asset), type_to_string(asset->type));
+				}
+
+				auto* asset_ptr = reinterpret_cast<SndContext*>(asset->header.data);
+				zonetool::h1::SndContext converted_asset{};
+				converted_asset.name = asset_ptr->name;
+				converted_asset.priority = static_cast<unsigned char>(asset_ptr->__pad0[0]);
+				std::memcpy(converted_asset.__pad0, &asset_ptr->__pad0[1], sizeof(converted_asset.__pad0));
+
+				zonetool::h1::sound_context::dump(&converted_asset);
+			}
 			DUMP_ASSET_NO_CONVERT(ASSET_TYPE_SOUND_CURVE, sound_curve, SndCurve);
 			DUMP_ASSET_NO_CONVERT(ASSET_TYPE_STRINGTABLE, string_table, StringTable);
 			DUMP_ASSET_NO_CONVERT(ASSET_TYPE_STRUCTURED_DATA_DEF, structured_data_def_set, StructuredDataDefSet);
@@ -867,6 +897,44 @@ namespace zonetool::h2
 		return dump_params;
 	}
 
+	bool filter_contains_images(const std::unordered_set<XAssetType>& filter)
+	{
+		return filter.empty() || filter.contains(ASSET_TYPE_IMAGE);
+	}
+
+	bool query_dds_dump_for_zone(const std::string& zone, const game::game_mode target,
+		const std::unordered_set<XAssetType>& filter)
+	{
+		if (!filter_contains_images(filter))
+		{
+			set_dump_images_as_dds_override(std::nullopt);
+			return true;
+		}
+
+		const auto mode = game::get_mode_as_string(target);
+		const auto prompt = utils::string::va(
+			"dumpzone target: %s\nzone: %s\n\nDump image assets as DDS?\n\n"
+			"Yes = dump DDS + normal image files\n"
+			"No = dump normal image files only\n"
+			"Cancel = cancel this dump command",
+			mode.data(), zone.data());
+
+		const auto result = MessageBoxA(nullptr, prompt, "ZoneTool - Image Dump Format",
+			MB_ICONQUESTION | MB_YESNOCANCEL | MB_SETFOREGROUND);
+
+		if (result == IDCANCEL)
+		{
+			ZONETOOL_INFO("dumpzone was cancelled by user.");
+			return false;
+		}
+
+		const auto dump_dds = result == IDYES;
+		set_dump_images_as_dds_override(dump_dds);
+		ZONETOOL_INFO("Image dump mode for this command: %s", dump_dds ? "DDS + normal" : "normal only");
+
+		return true;
+	}
+
 	void register_commands()
 	{
 		::h2::command::add("quit", []()
@@ -914,6 +982,16 @@ namespace zonetool::h2
 			{
 				return;
 			}
+
+			if (!query_dds_dump_for_zone(dump_params.zone, dump_params.target, dump_params.filter))
+			{
+				return;
+			}
+
+			const auto _0 = gsl::finally([]
+			{
+				set_dump_images_as_dds_override(std::nullopt);
+			});
 
 			asset_type_filter = dump_params.filter;
 			dump_zone(dump_params.zone, dump_params.target);
@@ -1170,6 +1248,18 @@ namespace zonetool::h2
 					}
 					else if (args[i] == "-dumpzone")
 					{
+						asset_type_filter.clear();
+						if (!query_dds_dump_for_zone(args[i + 1], game::h2, asset_type_filter))
+						{
+							i++;
+							continue;
+						}
+
+						const auto _0 = gsl::finally([]
+						{
+							set_dump_images_as_dds_override(std::nullopt);
+						});
+
 						dump_zone(args[i + 1], game::h2);
 						i++;
 					}

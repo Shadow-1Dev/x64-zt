@@ -16,6 +16,11 @@
 
 namespace zonetool::h1
 {
+	bool should_dump_images_as_dds();
+}
+
+namespace zonetool::h1
+{
 	namespace converter::h2
 	{
 		namespace gfximage
@@ -87,7 +92,7 @@ namespace zonetool::h1
 							utils::io::write_file(raw_path, pixel_data, false);
 						}
 
-						const auto dump_dds = false;
+						const auto dump_dds = should_dump_images_as_dds();
 						if (dump_dds)
 						{
 							DirectX::Image img = {};

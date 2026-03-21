@@ -1,5 +1,7 @@
 #pragma once
 
+#include <optional>
+
 #include <utils/hook.hpp>
 #include <utils/string.hpp>
 #include "game/h1/game.hpp"
@@ -105,4 +107,7 @@ namespace zonetool::h1
 
 	void initialize();
 	void start();
+
+	bool should_dump_images_as_dds();
+	void set_dump_images_as_dds_override(const std::optional<bool>& value);
 }

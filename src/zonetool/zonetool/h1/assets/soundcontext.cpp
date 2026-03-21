@@ -19,7 +19,17 @@ namespace zonetool::h1
 
 			file.open("rb");
 			auto bytes = file.read_bytes(file.size());
-			memcpy(asset->__pad0, bytes.data(), bytes.size());
+			if (bytes.size() >= 8)
+			{
+				// Legacy H2-style sndcontext payload (8 bytes): first byte maps to priority.
+				asset->priority = static_cast<unsigned char>(bytes[0]);
+				std::memcpy(asset->__pad0, bytes.data() + 1, sizeof(asset->__pad0));
+			}
+			else if (!bytes.empty())
+			{
+				const auto copy_size = std::min<std::size_t>(bytes.size(), sizeof(asset->__pad0));
+				std::memcpy(asset->__pad0, bytes.data(), copy_size);
+			}
 			file.close();
 
 			return asset;

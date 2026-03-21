@@ -656,7 +656,7 @@ namespace zonetool::h1
 
 	void gfx_image::dump(GfxImage* asset)
 	{
-		if (utils::flags::has_flag("dds"))
+		if (should_dump_images_as_dds())
 		{
 			dump_image_dds(asset);
 		}
