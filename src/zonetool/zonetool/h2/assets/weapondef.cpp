@@ -2706,13 +2706,19 @@ namespace zonetool::h2
 		return data;
 	}
 
-	void weapon_def::dump(WeaponDef* asset)
+	void weapon_def::dump(WeaponDef* asset, bool force_default_base_asset)
 	{
 		const auto path = "weapons\\"s + asset->name + ".json"s;
 
 		ordered_json data;
 
-		data["baseAsset"] = asset->szInternalName;
+		const char* base_asset_name = asset->szInternalName ? asset->szInternalName : "";
+		if (force_default_base_asset)
+		{
+			base_asset_name = "defaultweapon";
+		}
+
+		data["baseAsset"] = base_asset_name;
 
 		WEAPON_DUMP_STRING(szInternalName);
 		WEAPON_DUMP_STRING(szDisplayName);

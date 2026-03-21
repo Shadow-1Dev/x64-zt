@@ -232,6 +232,6 @@ namespace zonetool::h2
 		std::int32_t type() override;
 		void write(zone_base* zone, zone_buffer* buffer) override;
 
-		static void dump(WeaponDef* asset);
+		static void dump(WeaponDef* asset, bool force_default_base_asset = false);
 	};
 }

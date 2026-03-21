@@ -253,6 +253,52 @@ namespace zonetool::h1
 			return value.size() >= prefix_len && value.compare(0, prefix_len, prefix) == 0;
 		}
 
+		bool sound_name_looks_like_h2_placeholder(const std::string& value)
+		{
+			return string_starts_with(value, "h2_");
+		}
+
+		void set_sound_if_missing_or_h2_placeholder(json& sounds, const char* key, const std::string& value)
+		{
+			if (!sounds.is_object() || value.empty())
+			{
+				return;
+			}
+
+			const auto current = json_sound_or_empty(sounds, key);
+			const auto current_is_h2_placeholder = sound_name_looks_like_h2_placeholder(current);
+			const auto value_is_h2_placeholder = sound_name_looks_like_h2_placeholder(value);
+			if (current.empty() || (current_is_h2_placeholder && !value_is_h2_placeholder))
+			{
+				sounds[key] = value;
+			}
+		}
+
+		std::string pick_preferred_sound(const json& sounds, std::initializer_list<const char*> keys)
+		{
+			std::string first_non_empty_sound{};
+			for (const auto* key : keys)
+			{
+				const auto sound = json_sound_or_empty(sounds, key);
+				if (sound.empty())
+				{
+					continue;
+				}
+
+				if (first_non_empty_sound.empty())
+				{
+					first_non_empty_sound = sound;
+				}
+
+				if (!sound_name_looks_like_h2_placeholder(sound))
+				{
+					return sound;
+				}
+			}
+
+			return first_non_empty_sound;
+		}
+
 		void normalize_anim_map(json& data, const char* field)
 		{
 			const auto source = data[field];
@@ -532,48 +578,44 @@ namespace zonetool::h1
 			set_sound_if_missing(sounds, "fireSound", json_sound_or_empty(sounds, "fireFirstSound"));
 			set_sound_if_missing(sounds, "fireSoundPlayer", json_sound_or_empty(sounds, "fireFirstSoundPlayer"));
 
-			const auto fire_sound = json_sound_or_empty(sounds, "fireSound");
-			const auto fire_sound_player = json_sound_or_empty(sounds, "fireSoundPlayer");
-			if (!fire_sound_player.empty() && string_starts_with(fire_sound, "h2_"))
-			{
-				sounds["fireSound"] = fire_sound_player;
-			}
-
-			const auto fire_first_sound = json_sound_or_empty(sounds, "fireFirstSound");
 			const auto fire_first_sound_player = json_sound_or_empty(sounds, "fireFirstSoundPlayer");
-			if (!fire_first_sound_player.empty() && string_starts_with(fire_first_sound, "h2_"))
-			{
-				sounds["fireFirstSound"] = fire_first_sound_player;
-			}
+			set_sound_if_missing_or_h2_placeholder(sounds, "fireSoundPlayer", fire_first_sound_player);
 
-			const auto fire_first_sound_resolved = json_sound_or_empty(sounds, "fireFirstSound");
-			const auto fire_first_sound_player_resolved = json_sound_or_empty(sounds, "fireFirstSoundPlayer");
-			const auto is_h2_converted_fire = string_starts_with(fire_sound, "h2_") || string_starts_with(fire_first_sound, "h2_");
-			if (is_h2_converted_fire)
-			{
-				// Force sustained fire to reuse first-shot aliases for converted H2 weapons.
-				if (!fire_first_sound_player_resolved.empty())
-				{
-					sounds["fireLoopSoundPlayer"] = fire_first_sound_player_resolved;
-				}
-				if (!fire_first_sound_resolved.empty())
-				{
-					sounds["fireLoopSound"] = fire_first_sound_resolved;
-				}
-			}
+			const auto fire_sound_player = json_sound_or_empty(sounds, "fireSoundPlayer");
+			set_sound_if_missing_or_h2_placeholder(sounds, "fireSoundPlayerAkimbo", fire_sound_player);
+			set_sound_if_missing_or_h2_placeholder(sounds, "fireSound", fire_sound_player);
+			set_sound_if_missing_or_h2_placeholder(sounds, "fireSound", fire_first_sound_player);
+			set_sound_if_missing_or_h2_placeholder(sounds, "fireFirstSound", fire_first_sound_player);
+			set_sound_if_missing_or_h2_placeholder(sounds, "fireFirstSound", fire_sound_player);
 
-			const auto fire_loop_sound = json_sound_or_empty(sounds, "fireLoopSound");
-			const auto fire_loop_sound_player = json_sound_or_empty(sounds, "fireLoopSoundPlayer");
-			if (string_starts_with(fire_sound, "h2_")
-				&& fire_loop_sound.empty()
-				&& fire_loop_sound_player.empty()
-				&& !fire_first_sound_player.empty())
-			{
-				// Converted H2 weapons can end up with a non-looping regular fire alias.
-				// Promote the known-good first-shot player alias for sustained fire.
-				sounds["fireSoundPlayer"] = fire_first_sound_player;
-				sounds["fireSound"] = fire_first_sound_player;
-			}
+			alias_sound_if_missing(sounds, "fireLoopSound", "sound21");
+			alias_sound_if_missing(sounds, "fireLoopSoundPlayer", "sound22");
+
+			const auto preferred_fire_loop_sound_player = pick_preferred_sound(sounds, {
+				"fireLoopSoundPlayer",
+				"sound22",
+				"fireMedLoopSoundPlayer",
+				"fireHighLoopSoundPlayer",
+				"fireSoundPlayer",
+				"fireFirstSoundPlayer",
+				"fireSound",
+				"fireFirstSound"
+			});
+			set_sound_if_missing_or_h2_placeholder(sounds, "fireLoopSoundPlayer", preferred_fire_loop_sound_player);
+
+			const auto preferred_fire_loop_sound = pick_preferred_sound(sounds, {
+				"fireLoopSound",
+				"sound21",
+				"fireMedLoopSound",
+				"fireHighLoopSound",
+				"fireLoopSoundPlayer",
+				"sound22",
+				"fireSound",
+				"fireFirstSound",
+				"fireSoundPlayer",
+				"fireFirstSoundPlayer"
+			});
+			set_sound_if_missing_or_h2_placeholder(sounds, "fireLoopSound", preferred_fire_loop_sound);
 
 			set_sound_if_missing(sounds, "fireLoopSoundPlayer", json_sound_or_empty(sounds, "fireSoundPlayer"));
 			set_sound_if_missing(sounds, "fireLoopSound", json_sound_or_empty(sounds, "fireSoundPlayer"));
@@ -2795,11 +2837,15 @@ namespace zonetool::h1
 		return data;
 	}
 
-	void weapon_def::dump(WeaponDef* asset)
+	void weapon_def::dump(WeaponDef* asset, bool force_default_base_asset)
 	{
 		const auto path = "weapons\\"s + asset->name + ".json"s;
 
 		ordered_json data;
+		if (force_default_base_asset)
+		{
+			data["baseAsset"] = "defaultweapon";
+		}
 
 		WEAPON_DUMP_STRING(szInternalName);
 		WEAPON_DUMP_STRING(szDisplayName);

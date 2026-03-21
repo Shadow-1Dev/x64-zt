@@ -665,6 +665,27 @@ namespace zonetool::h2
 					const auto name = mapped_dsp_buses[h2_name];
 					return get_h1_dsp_bus_index_from_name(name);
 				}
+
+				unsigned int convert_flags(unsigned int h2_flags)
+				{
+					zonetool::h1::SoundAliasFlags target_flags{};
+					target_flags.intValue = h2_flags;
+
+					const auto type_from_h1_layout = (h2_flags >> 16) & 0x7;
+					const auto type_from_h2_layout = (h2_flags >> 6) & 0x3;
+					if (type_from_h1_layout == 0 && type_from_h2_layout != 0)
+					{
+						target_flags.packed.type = type_from_h2_layout;
+					}
+
+					const auto is3d_from_h2_layout = (h2_flags >> 5) & 0x1;
+					if (!target_flags.packed.spatializedIs3D && is3d_from_h2_layout)
+					{
+						target_flags.packed.spatializedIs3D = 1;
+					}
+
+					return target_flags.intValue;
+				}
 			}
 
 			zonetool::h1::snd_alias_list_t* convert(zonetool::h2::snd_alias_list_t* asset, utils::memory::allocator& allocator)
@@ -702,7 +723,7 @@ namespace zonetool::h2
 					new_head->distMin = head->distMin;
 					new_head->distMax = head->distMax;
 					new_head->velocityMin = head->velocityMin;
-					new_head->flags = head->flags;
+					new_head->flags = convert_flags(head->flags);
 					new_head->masterPriority = head->masterPriority;
 					new_head->masterPercentage = head->masterPercentage;
 					new_head->slavePercentage = head->slavePercentage;

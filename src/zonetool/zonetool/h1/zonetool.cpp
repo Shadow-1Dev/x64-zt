@@ -21,6 +21,7 @@ namespace zonetool::h1
 	zonetool_globals_t globals{};
 	std::vector<std::pair<XAssetType, std::string>> referenced_assets;
 	std::unordered_set<XAssetType> asset_type_filter;
+	bool resolving_references = false;
 
 	std::unordered_set<std::pair<std::uint32_t, std::string>, pair_hash<std::uint32_t, std::string>> ignore_assets;
 
@@ -257,7 +258,15 @@ namespace zonetool::h1
 			DUMP_ASSET_NO_CONVERT(ASSET_TYPE_TRACER, tracer_def, TracerDef);
 			DUMP_ASSET_NO_CONVERT(ASSET_TYPE_TTF, ttf_def, TTFDef);
 			DUMP_ASSET_NO_CONVERT(ASSET_TYPE_ATTACHMENT, weapon_attachment, WeaponAttachment);
-			DUMP_ASSET_NO_CONVERT(ASSET_TYPE_WEAPON, weapon_def, WeaponDef);
+			if (asset->type == ASSET_TYPE_WEAPON)
+			{
+				if (IS_DEBUG)
+				{
+					ZONETOOL_INFO("Dumping asset \"%s\" of type %s.", get_asset_name(asset), type_to_string(asset->type));
+				}
+				auto asset_ptr = reinterpret_cast<WeaponDef*>(asset->header.data);
+				weapon_def::dump(asset_ptr, true);
+			}
 			DUMP_ASSET_NO_CONVERT(ASSET_TYPE_XANIMPARTS, xanim_parts, XAnimParts);
 			DUMP_ASSET(ASSET_TYPE_XMODEL, xmodel, XModel);
 			DUMP_ASSET_NO_CONVERT(ASSET_TYPE_XMODEL_SURFS, xsurface, XModelSurfs);
@@ -505,7 +514,10 @@ namespace zonetool::h1
 
 		if (is_referenced_asset(asset))
 		{
-			//referenced_assets.emplace_back(asset->type, get_asset_name(asset));
+			if (!resolving_references)
+			{
+				referenced_assets.emplace_back(asset->type, get_asset_name(asset));
+			}
 			return;
 		}
 
@@ -527,6 +539,7 @@ namespace zonetool::h1
 		referenced_assets.erase(std::unique(referenced_assets.begin(),
 			referenced_assets.end()), referenced_assets.end());
 
+		resolving_references = true;
 		for (auto& asset : referenced_assets)
 		{
 			if (asset.second.length() <= 1)
@@ -560,6 +573,7 @@ namespace zonetool::h1
 
 			dump_asset(&referenced_asset);
 		}
+		resolving_references = false;
 
 		referenced_assets.clear();
 	}
