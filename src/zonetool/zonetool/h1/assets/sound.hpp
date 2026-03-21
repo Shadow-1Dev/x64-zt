@@ -15,7 +15,7 @@ namespace zonetool::h1
 		static void json_parse_snd_alias(snd_alias_t* asset, json snddata, zone_memory* mem);
 		static snd_alias_list_t* json_parse(const std::string& name, zone_memory* mem);
 
-		static void json_dump_snd_alias(ordered_json& sound, snd_alias_t* asset);
+		static void json_dump_snd_alias(ordered_json& sound, snd_alias_t* asset, unsigned char head_index);
 		static void json_dump(snd_alias_list_t* asset);
 
 	public:

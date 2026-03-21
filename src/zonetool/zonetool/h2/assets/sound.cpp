@@ -187,6 +187,113 @@ namespace zonetool::h2
 		"whizbys",
 	};
 
+	namespace
+	{
+		constexpr std::size_t kSoundfileWaveHeaderSize = 46;
+
+		template <typename TStreamFilename>
+		void dump_streamed_soundfile_data(const char* alias_name, unsigned char head_index, const TStreamFilename& filename)
+		{
+			if (!filename.fileIndex)
+			{
+				return;
+			}
+
+			const auto safe_alias_name = alias_name ? alias_name : "null";
+
+			const auto db_fs = ::h2::game::DB_FSInitialize();
+			const char* soundfile_path = nullptr;
+			if (filename.isLocalized)
+			{
+				soundfile_path = utils::string::va("%s/%s_soundfile%d.pak",
+					::h2::game::SEH_GetCurrentLanguageName(),
+					::h2::game::SEH_GetCurrentLanguageCode(),
+					filename.fileIndex);
+			}
+			else
+			{
+				soundfile_path = utils::string::va("soundfile%d.pak", filename.fileIndex);
+			}
+
+			const auto soundfile = db_fs->vftbl->OpenFile(db_fs, ::h2::game::Sys_Folder::SF_PAKFILE, soundfile_path);
+			const auto _0 = gsl::finally([&]
+			{
+				if (soundfile)
+				{
+					db_fs->vftbl->Close(db_fs, soundfile);
+				}
+			});
+
+			if (!soundfile)
+			{
+				ZONETOOL_ERROR("%s: failed to open streamed sound file pak: %s", safe_alias_name, soundfile_path);
+				return;
+			}
+
+			auto snd_data_offset = filename.info.packed.offset;
+			auto snd_data_size = filename.info.packed.length;
+
+			if (!snd_data_size)
+			{
+				ZONETOOL_ERROR("%s: streamed packed length is zero", safe_alias_name);
+				return;
+			}
+
+			bool flac_data = true;
+			std::vector<std::uint8_t> snd_data;
+			snd_data.resize(static_cast<std::size_t>(snd_data_size));
+
+			db_fs->vftbl->Read(db_fs, soundfile, snd_data_offset, snd_data_size, snd_data.data());
+
+			if (std::strncmp(reinterpret_cast<char*>(snd_data.data()), "fLaC", 4))
+			{
+				flac_data = false;
+
+				if (snd_data_offset < kSoundfileWaveHeaderSize)
+				{
+					ZONETOOL_ERROR("%s: invalid packed offset for streamed wave sound", safe_alias_name);
+					return;
+				}
+
+				snd_data_offset -= kSoundfileWaveHeaderSize;
+				snd_data_size += kSoundfileWaveHeaderSize;
+				snd_data.resize(static_cast<std::size_t>(snd_data_size));
+
+				db_fs->vftbl->Read(db_fs, soundfile, snd_data_offset, snd_data_size, snd_data.data());
+
+				if (std::strncmp(reinterpret_cast<char*>(snd_data.data()), "RIFF", 4))
+				{
+					ZONETOOL_ERROR("%s: failed to get wave header from streamed sound", safe_alias_name);
+					return;
+				}
+			}
+
+			std::string streamed_name = utils::string::va("%s_%u", safe_alias_name, static_cast<unsigned int>(head_index));
+			if (filename.isLocalized)
+			{
+				streamed_name = utils::string::va("%s/%s_%s_%u",
+					::h2::game::SEH_GetCurrentLanguageName(),
+					::h2::game::SEH_GetCurrentLanguageCode(),
+					safe_alias_name,
+					static_cast<unsigned int>(head_index));
+			}
+
+			const auto output_path = utils::string::va("loaded_sound/streamed/%s%s",
+				streamed_name.data(),
+				flac_data ? ".flac" : ".wav");
+			auto out = filesystem::file(output_path);
+			out.open("wb");
+
+			if (!out.get_fp())
+			{
+				ZONETOOL_ERROR("%s: failed to write streamed sound dump: %s", safe_alias_name, output_path.data());
+				return;
+			}
+
+			out.write(snd_data.data(), snd_data.size(), 1);
+		}
+	}
+
 	const char* get_vol_mod_name(short index)
 	{
 		return volume_mod_groups[index];
@@ -696,7 +803,7 @@ namespace zonetool::h2
 		buf->pop_stream();
 	}
 
-	void sound::json_dump_snd_alias(ordered_json& sound, snd_alias_t* asset)
+	void sound::json_dump_snd_alias(ordered_json& sound, snd_alias_t* asset, unsigned char head_index)
 	{
 		SOUND_DUMP_STRING(aliasName);
 		SOUND_DUMP_STRING(secondaryAliasName);
@@ -743,6 +850,11 @@ namespace zonetool::h2
 						? asset->soundFile->u.streamSnd.filename.info.raw.name
 						: "";
 				}
+
+				if (asset->soundFile->exists)
+				{
+					dump_streamed_soundfile_data(asset->aliasName, head_index, asset->soundFile->u.streamSnd.filename);
+				}
 			};
 
 			auto insert_primed = [&]()
@@ -781,6 +893,11 @@ namespace zonetool::h2
 				sound["soundfile"]["dataOffset"] = asset->soundFile->u.primedSnd.dataOffset;
 				sound["soundfile"]["totalSize"] = asset->soundFile->u.primedSnd.totalSize;
 				//sound["soundfile"]["primedCrc"] = asset->soundFile->u.primedSnd.primedCrc;
+
+				if (asset->soundFile->exists)
+				{
+					dump_streamed_soundfile_data(asset->aliasName, head_index, asset->soundFile->u.primedSnd.streamedPart);
+				}
 			};
 
 			if (asset->soundFile->type == SAT_LOADED)
@@ -909,7 +1026,7 @@ namespace zonetool::h2
 		for (unsigned char i = 0; i < asset->count; i++)
 		{
 			ordered_json alias;
-			json_dump_snd_alias(alias, &asset->head[i]);
+			json_dump_snd_alias(alias, &asset->head[i], i);
 			sound["head"][i] = alias;
 		}
 
