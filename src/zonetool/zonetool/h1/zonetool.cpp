@@ -6,6 +6,7 @@
 #include "../utils/gsc.hpp"
 #include "../utils/csv_generator.hpp"
 
+#include <utils/flags.hpp>
 #include <utils/io.hpp>
 
 namespace zonetool::h1
@@ -33,7 +34,7 @@ namespace zonetool::h1
 			return dump_images_as_dds_override.value();
 		}
 
-		return utils::flags::has_flag("dds");
+			return ::utils::flags::has_flag("dds");
 	}
 
 	void set_dump_images_as_dds_override(const std::optional<bool>& value)
@@ -559,8 +560,8 @@ namespace zonetool::h1
 		const auto dump_func = dump_functions.find(globals.target_game);
 		if (dump_func == dump_functions.end())
 		{
-			const auto name = game::get_mode_as_string(globals.target_game);
-			ZONETOOL_ERROR("Dump mode \"%s\" is not supported", name.data());
+			const std::string name = game::get_mode_as_string(globals.target_game);
+			ZONETOOL_ERROR("Dump mode \"%s\" is not supported", name.c_str());
 			return;
 		}
 
@@ -1191,13 +1192,13 @@ namespace zonetool::h1
 			return true;
 		}
 
-		const auto mode = game::get_mode_as_string(target);
+		const std::string mode = game::get_mode_as_string(target);
 		const auto prompt = utils::string::va(
 			"dumpzone target: %s\nzone: %s\n\nDump image assets as DDS?\n\n"
 			"Yes = dump DDS + normal image files\n"
 			"No = dump normal image files only\n"
 			"Cancel = cancel this dump command",
-			mode.data(), zone.data());
+			mode.c_str(), zone.c_str());
 
 		const auto result = MessageBoxA(nullptr, prompt, "ZoneTool - Image Dump Format",
 			MB_ICONQUESTION | MB_YESNOCANCEL | MB_SETFOREGROUND);

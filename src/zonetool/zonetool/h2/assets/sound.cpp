@@ -286,7 +286,7 @@ namespace zonetool::h2
 
 			if (!out.get_fp())
 			{
-				ZONETOOL_ERROR("%s: failed to write streamed sound dump: %s", safe_alias_name, output_path.data());
+				ZONETOOL_ERROR("%s: failed to write streamed sound dump: %s", safe_alias_name, output_path);
 				return;
 			}
 
