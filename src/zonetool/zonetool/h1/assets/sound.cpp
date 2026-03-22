@@ -242,17 +242,6 @@ namespace zonetool::h1
 	{
 		constexpr std::size_t kSoundfileWaveHeaderSize = 46;
 
-		bool starts_with(const char* value, const char* prefix)
-		{
-			if (!value || !prefix)
-			{
-				return false;
-			}
-
-			const auto prefix_len = std::strlen(prefix);
-			return std::strncmp(value, prefix, prefix_len) == 0;
-		}
-
 		int json_member_int_or_default(const json& value, const char* key, int default_value = 0)
 		{
 			if (!value.is_object())
@@ -279,7 +268,7 @@ namespace zonetool::h1
 			return default_value;
 		}
 
-		void normalize_weapon_sound_flags_type(snd_alias_t* asset)
+		void normalize_sound_flags_type(snd_alias_t* asset)
 		{
 			if (!asset)
 			{
@@ -288,42 +277,15 @@ namespace zonetool::h1
 
 			SoundAliasFlags flags{ 0 };
 			flags.intValue = asset->flags;
-			if (flags.packed.type != 0)
+
+			if (asset->soundFile &&
+				asset->soundFile->type > SAT_UNKNOWN &&
+				asset->soundFile->type < SAT_COUNT)
 			{
-				return;
+				flags.packed.type = static_cast<unsigned int>(asset->soundFile->type);
 			}
 
-			const auto vol_mod_index = static_cast<int>(asset->volModIndex);
-			const auto* vol_mod_name = (vol_mod_index >= 0 &&
-				vol_mod_index < static_cast<int>(volume_mod_groups.size()))
-				? volume_mod_groups[vol_mod_index]
-				: nullptr;
-			if (vol_mod_name &&
-				(starts_with(vol_mod_name, "wpn_npc_") ||
-				 starts_with(vol_mod_name, "mp_wpn_npc") ||
-				 starts_with(vol_mod_name, "iw4_wpn_npc")))
-			{
-				flags.packed.type = 1;
-			}
-			else if (vol_mod_name &&
-				(starts_with(vol_mod_name, "wpn_plr_") ||
-				 starts_with(vol_mod_name, "mp_wpn_plr") ||
-				 starts_with(vol_mod_name, "iw4_wpn_plr")))
-			{
-				flags.packed.type = 2;
-			}
-			else if (asset->aliasName)
-			{
-				const auto* alias = asset->aliasName;
-				if (std::strstr(alias, "_npc_") || starts_with(alias, "weap_"))
-				{
-					flags.packed.type = 1;
-				}
-				else if (std::strstr(alias, "_plr") || starts_with(alias, "h1_wpn_"))
-				{
-					flags.packed.type = 2;
-				}
-			}
+			flags.packed.unused = 0;
 
 			asset->flags = flags.intValue;
 		}
@@ -554,7 +516,7 @@ namespace zonetool::h1
 		SOUND_READ_FIELD(priority);
 		asset->dspBusIndex = get_dsp_bus_index_from_name(snddata["dspBus"].get<std::string>().data()); //SOUND_CHAR(dspBusIndex);
 		asset->volModIndex = get_vol_mod_index_from_name(snddata["volMod"].get<std::string>().data()); //SOUND_SHORT(volModIndex);
-		normalize_weapon_sound_flags_type(asset);
+		normalize_sound_flags_type(asset);
 		SOUND_READ_FIELD(volMin);
 		SOUND_READ_FIELD(volMax);
 		SOUND_READ_FIELD(pitchMin);
