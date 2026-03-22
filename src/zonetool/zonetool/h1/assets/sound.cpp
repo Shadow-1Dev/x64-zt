@@ -242,6 +242,92 @@ namespace zonetool::h1
 	{
 		constexpr std::size_t kSoundfileWaveHeaderSize = 46;
 
+		bool starts_with(const char* value, const char* prefix)
+		{
+			if (!value || !prefix)
+			{
+				return false;
+			}
+
+			const auto prefix_len = std::strlen(prefix);
+			return std::strncmp(value, prefix, prefix_len) == 0;
+		}
+
+		int json_member_int_or_default(const json& value, const char* key, int default_value = 0)
+		{
+			if (!value.is_object())
+			{
+				return default_value;
+			}
+
+			const auto it = value.find(key);
+			if (it == value.end())
+			{
+				return default_value;
+			}
+
+			if (it->is_number_integer())
+			{
+				return it->get<int>();
+			}
+
+			if (it->is_number())
+			{
+				return static_cast<int>(it->get<double>());
+			}
+
+			return default_value;
+		}
+
+		void normalize_weapon_sound_flags_type(snd_alias_t* asset)
+		{
+			if (!asset)
+			{
+				return;
+			}
+
+			SoundAliasFlags flags{ 0 };
+			flags.intValue = asset->flags;
+			if (flags.packed.type != 0)
+			{
+				return;
+			}
+
+			const auto vol_mod_index = static_cast<int>(asset->volModIndex);
+			const auto* vol_mod_name = (vol_mod_index >= 0 &&
+				vol_mod_index < static_cast<int>(volume_mod_groups.size()))
+				? volume_mod_groups[vol_mod_index]
+				: nullptr;
+			if (vol_mod_name &&
+				(starts_with(vol_mod_name, "wpn_npc_") ||
+				 starts_with(vol_mod_name, "mp_wpn_npc") ||
+				 starts_with(vol_mod_name, "iw4_wpn_npc")))
+			{
+				flags.packed.type = 1;
+			}
+			else if (vol_mod_name &&
+				(starts_with(vol_mod_name, "wpn_plr_") ||
+				 starts_with(vol_mod_name, "mp_wpn_plr") ||
+				 starts_with(vol_mod_name, "iw4_wpn_plr")))
+			{
+				flags.packed.type = 2;
+			}
+			else if (asset->aliasName)
+			{
+				const auto* alias = asset->aliasName;
+				if (std::strstr(alias, "_npc_") || starts_with(alias, "weap_"))
+				{
+					flags.packed.type = 1;
+				}
+				else if (std::strstr(alias, "_plr") || starts_with(alias, "h1_wpn_"))
+				{
+					flags.packed.type = 2;
+				}
+			}
+
+			asset->flags = flags.intValue;
+		}
+
 		template <typename TStreamFilename>
 		void dump_streamed_soundfile_data(const char* alias_name, unsigned char head_index, const TStreamFilename& filename)
 		{
@@ -434,24 +520,28 @@ namespace zonetool::h1
 		if (snddata["flags"].is_object())
 		{
 			SoundAliasFlags flags{ 0 };
+			const auto& json_flags = snddata["flags"];
 
-			flags.packed.looping = snddata["flags"]["looping"].get<int>();
-			flags.packed.isMaster = snddata["flags"]["isMaster"].get<int>();
-			flags.packed.isSlave = snddata["flags"]["isSlave"].get<int>();
-			flags.packed.fullDryLevel = snddata["flags"]["fullDryLevel"].get<int>();
-			flags.packed.noWetLevel = snddata["flags"]["noWetLevel"].get<int>();
-			flags.packed.randomLooping = snddata["flags"]["randomLooping"].get<int>();
-			flags.packed.spatializedRangeCheck = snddata["flags"]["spatializedRangeCheck"].get<int>();
-			flags.packed.spatializedIs3D = snddata["flags"]["spatializedIs3D"].get<int>();
-			flags.packed.unk9 = snddata["flags"]["unk9"].get<int>();
-			flags.packed.inheritPitch = snddata["flags"]["inheritPitch"].get<int>();
-			flags.packed.inheritVolume = snddata["flags"]["inheritVolume"].get<int>();
-			flags.packed.useContextList = snddata["flags"]["useContextList"].get<int>();
-			flags.packed.useNoPanning2D = snddata["flags"]["useNoPanning2D"].get<int>();
-			flags.packed.useOldPanning = snddata["flags"]["useOldPanning"].get<int>();
-			flags.packed.useNoPanning3D = snddata["flags"]["useNoPanning3D"].get<int>();
-			flags.packed.type = snddata["flags"]["type"].get<int>();
-			flags.packed.unused = snddata["flags"]["unused"].get<int>();
+			flags.packed.looping = json_member_int_or_default(json_flags, "looping");
+			flags.packed.isMaster = json_member_int_or_default(json_flags, "isMaster");
+			flags.packed.isSlave = json_member_int_or_default(json_flags, "isSlave");
+			flags.packed.fullDryLevel = json_member_int_or_default(json_flags, "fullDryLevel");
+			flags.packed.noWetLevel = json_member_int_or_default(json_flags, "noWetLevel");
+			flags.packed.randomLooping = json_member_int_or_default(json_flags, "randomLooping");
+			flags.packed.spatializedRangeCheck = json_member_int_or_default(json_flags, "spatializedRangeCheck");
+			flags.packed.spatializedIs3D = json_member_int_or_default(
+				json_flags, "spatializedIs3D", json_member_int_or_default(json_flags, "is3d"));
+			flags.packed.unk9 = json_member_int_or_default(
+				json_flags, "unk9", json_member_int_or_default(json_flags, "unk1"));
+			flags.packed.inheritPitch = json_member_int_or_default(json_flags, "inheritPitch");
+			flags.packed.inheritVolume = json_member_int_or_default(json_flags, "inheritVolume");
+			flags.packed.useContextList = json_member_int_or_default(json_flags, "useContextList");
+			flags.packed.useNoPanning2D = json_member_int_or_default(json_flags, "useNoPanning2D");
+			flags.packed.useOldPanning = json_member_int_or_default(json_flags, "useOldPanning");
+			flags.packed.useNoPanning3D = json_member_int_or_default(json_flags, "useNoPanning3D");
+			flags.packed.type = json_member_int_or_default(json_flags, "type");
+			flags.packed.unused = json_member_int_or_default(
+				json_flags, "unused", json_member_int_or_default(json_flags, "unk2"));
 
 			asset->flags = flags.intValue;
 		}
@@ -464,6 +554,7 @@ namespace zonetool::h1
 		SOUND_READ_FIELD(priority);
 		asset->dspBusIndex = get_dsp_bus_index_from_name(snddata["dspBus"].get<std::string>().data()); //SOUND_CHAR(dspBusIndex);
 		asset->volModIndex = get_vol_mod_index_from_name(snddata["volMod"].get<std::string>().data()); //SOUND_SHORT(volModIndex);
+		normalize_weapon_sound_flags_type(asset);
 		SOUND_READ_FIELD(volMin);
 		SOUND_READ_FIELD(volMax);
 		SOUND_READ_FIELD(pitchMin);

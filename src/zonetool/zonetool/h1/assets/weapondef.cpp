@@ -590,10 +590,13 @@ namespace zonetool::h1
 
 			alias_sound_if_missing(sounds, "fireLoopSound", "sound21");
 			alias_sound_if_missing(sounds, "fireLoopSoundPlayer", "sound22");
+			alias_sound_if_missing(sounds, "fireLoopSound", "loop");
+			alias_sound_if_missing(sounds, "fireLoopSoundPlayer", "loop");
 
 			const auto preferred_fire_loop_sound_player = pick_preferred_sound(sounds, {
 				"fireLoopSoundPlayer",
 				"sound22",
+				"loop",
 				"fireMedLoopSoundPlayer",
 				"fireHighLoopSoundPlayer",
 				"fireSoundPlayer",
@@ -606,6 +609,7 @@ namespace zonetool::h1
 			const auto preferred_fire_loop_sound = pick_preferred_sound(sounds, {
 				"fireLoopSound",
 				"sound21",
+				"loop",
 				"fireMedLoopSound",
 				"fireHighLoopSound",
 				"fireLoopSoundPlayer",

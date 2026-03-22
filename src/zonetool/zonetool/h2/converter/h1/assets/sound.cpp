@@ -686,6 +686,61 @@ namespace zonetool::h2
 
 					return target_flags.intValue;
 				}
+
+				bool starts_with(const char* value, const char* prefix)
+				{
+					if (!value || !prefix)
+					{
+						return false;
+					}
+
+					const auto prefix_len = std::strlen(prefix);
+					return std::strncmp(value, prefix, prefix_len) == 0;
+				}
+
+				unsigned int normalize_h1_sound_type_for_volmod(unsigned int h1_flags, short h1_vol_mod_index, const char* alias_name)
+				{
+					zonetool::h1::SoundAliasFlags flags{};
+					flags.intValue = h1_flags;
+					if (flags.packed.type != 0)
+					{
+						return flags.intValue;
+					}
+
+					if (h1_vol_mod_index >= 0 &&
+						static_cast<std::size_t>(h1_vol_mod_index) < h1_volume_mod_groups.size())
+					{
+						const auto* vol_mod_name = h1_volume_mod_groups[h1_vol_mod_index];
+						if (vol_mod_name &&
+							(starts_with(vol_mod_name, "wpn_npc_") ||
+							 starts_with(vol_mod_name, "mp_wpn_npc") ||
+							 starts_with(vol_mod_name, "iw4_wpn_npc")))
+						{
+							flags.packed.type = 1;
+						}
+						else if (vol_mod_name &&
+							(starts_with(vol_mod_name, "wpn_plr_") ||
+							 starts_with(vol_mod_name, "mp_wpn_plr") ||
+							 starts_with(vol_mod_name, "iw4_wpn_plr")))
+						{
+							flags.packed.type = 2;
+						}
+					}
+
+					if (flags.packed.type == 0 && alias_name)
+					{
+						if (std::strstr(alias_name, "_npc_") || starts_with(alias_name, "weap_"))
+						{
+							flags.packed.type = 1;
+						}
+						else if (std::strstr(alias_name, "_plr") || starts_with(alias_name, "h1_wpn_"))
+						{
+							flags.packed.type = 2;
+						}
+					}
+
+					return flags.intValue;
+				}
 			}
 
 			zonetool::h1::snd_alias_list_t* convert(zonetool::h2::snd_alias_list_t* asset, utils::memory::allocator& allocator)
@@ -724,6 +779,7 @@ namespace zonetool::h2
 					new_head->distMax = head->distMax;
 					new_head->velocityMin = head->velocityMin;
 					new_head->flags = convert_flags(head->flags);
+					new_head->flags = normalize_h1_sound_type_for_volmod(new_head->flags, new_head->volModIndex, new_head->aliasName);
 					new_head->masterPriority = head->masterPriority;
 					new_head->masterPercentage = head->masterPercentage;
 					new_head->slavePercentage = head->slavePercentage;
@@ -836,8 +892,11 @@ namespace zonetool::h2
 
 						zonetool::h1::SoundAliasFlags flags{ 0 };
 						flags.intValue = new_head->flags;
-						flags.packed.type = zonetool::h1::SAT_LOADED;
-						new_head->flags = flags.intValue;
+						if (flags.packed.type == 0)
+						{
+							flags.packed.type = zonetool::h1::SAT_LOADED;
+						}
+						new_head->flags = normalize_h1_sound_type_for_volmod(flags.intValue, new_head->volModIndex, new_head->aliasName);
 
 						new_head->soundFile->u.loadSnd = allocator.allocate<zonetool::h1::LoadedSound>();
 						auto* new_loaded = new_head->soundFile->u.loadSnd;
