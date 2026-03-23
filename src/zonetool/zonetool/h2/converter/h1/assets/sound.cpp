@@ -668,16 +668,13 @@ namespace zonetool::h2
 
 				unsigned int convert_flags(unsigned int h2_flags, zonetool::h2::snd_alias_type_t sound_type)
 				{
-					zonetool::h2::SoundAliasFlags source_flags{};
-					source_flags.intValue = h2_flags;
-
 					zonetool::h1::SoundAliasFlags target_flags{};
-					target_flags.packed.looping = source_flags._.looping;
-					target_flags.packed.isMaster = source_flags._.isMaster;
-					target_flags.packed.isSlave = source_flags._.isSlave;
-					target_flags.packed.fullDryLevel = source_flags._.fullDryLevel;
-					target_flags.packed.noWetLevel = source_flags._.noWetLevel;
-					target_flags.packed.spatializedIs3D = source_flags._.is3d;
+					target_flags.packed.looping = (h2_flags >> 0) & 0x1;
+					target_flags.packed.isMaster = (h2_flags >> 1) & 0x1;
+					target_flags.packed.isSlave = (h2_flags >> 2) & 0x1;
+					target_flags.packed.fullDryLevel = (h2_flags >> 3) & 0x1;
+					target_flags.packed.noWetLevel = (h2_flags >> 4) & 0x1;
+					target_flags.packed.spatializedIs3D = (h2_flags >> 5) & 0x1;
 
 					const auto type_from_h1_layout = (h2_flags >> 16) & 0x7;
 					const auto type_from_h2_layout = (h2_flags >> 6) & 0x3;
