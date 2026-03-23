@@ -545,20 +545,28 @@ namespace zonetool::h2
 				return true;
 			}
 
-			void convert_shader_program(unsigned char** program, unsigned int* program_size, utils::memory::allocator& allocator)
+			void convert_shader_program(const char* shader_name, unsigned char** program, unsigned int* program_size, utils::memory::allocator& allocator)
 			{
 				if (*program == nullptr)
 				{
 					return;
 				}
 				
-				const auto data = std::string{reinterpret_cast<const char*>(*program), *program_size};
-				const auto shader = alys::shader::patch_shader(data, patch_cb_index);
-				const auto new_program = allocator.allocate_array<unsigned char>(shader.size());
-				std::memcpy(new_program, shader.data(), shader.size());
+				try
+				{
+					const auto data = std::string{reinterpret_cast<const char*>(*program), *program_size};
+					const auto shader = alys::shader::patch_shader(data, patch_cb_index);
+					const auto new_program = allocator.allocate_array<unsigned char>(shader.size());
+					std::memcpy(new_program, shader.data(), shader.size());
 
-				*program = new_program;
-				*program_size = static_cast<std::uint32_t>(shader.size());
+					*program = new_program;
+					*program_size = static_cast<std::uint32_t>(shader.size());
+				}
+				catch (const std::exception& e)
+				{
+					ZONETOOL_ERROR("Failed to patch shader \"%s\": %s. Falling back to raw bytecode.",
+						shader_name ? shader_name : "<unnamed>", e.what());
+				}
 			}
 
 			template <shader_type ShaderType, typename T, typename S>
@@ -569,7 +577,7 @@ namespace zonetool::h2
 
 				if constexpr (ShaderType != none)
 				{
-					convert_shader_program(&new_shader->prog.loadDef.program, &new_shader->prog.loadDef.programSize, allocator);
+					convert_shader_program(new_shader->name, &new_shader->prog.loadDef.program, &new_shader->prog.loadDef.programSize, allocator);
 
 					if constexpr (ShaderType == pixelshader || ShaderType == vertexshader)
 					{
